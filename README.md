@@ -50,3 +50,7 @@ Check the status of Java processes with dsh -a jps.
 # Notes
 Replace IPs and hostnames with your actual values.
 Ensure all machines are connected and accessible via private IPs.
+
+
+### Author : Rushikesh Shinde
+### Contact : +91 9623548002
