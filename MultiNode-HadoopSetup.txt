@@ -1,0 +1,160 @@
+# Step 1: Launch 6 Machines and Name Them
+
+# SSH into all machines
+ssh nn
+ssh snn
+ssh jt
+ssh dn1
+ssh dn2
+ssh dn3
+
+# Verify connectivity
+arp
+
+# Configure internal DNS by updating /etc/hosts on each machine
+sudo nano /etc/hosts
+# Add the following to /etc/hosts (use actual IP addresses):
+# 172.31.0.208 nn
+# 172.31.1.86 snn
+# 172.31.11.56 jt
+# 172.31.11.76 dn1
+# 172.31.12.52 dn2
+# 172.31.12.81 dn3
+
+# Step 2: Configure Passwordless Login
+
+# Copy the key to all machines
+scp -i Keyname.pem Keyname.pem ubuntu@18.217.9.47:/home/ubuntu/.ssh
+
+# Change permissions on the key
+chmod 400 rdMUM.pem
+
+# SSH into all machines using the private key
+ssh -i rdMUM.pem nn
+ssh -i rdMUM.pem snn
+ssh -i rdMUM.pem jt
+ssh -i rdMUM.pem dn1
+ssh -i rdMUM.pem dn2
+ssh -i rdMUM.pem dn3
+
+# Set up SSH agent and add the key
+nano ~/.profile
+eval `ssh-agent`
+ssh-add /home/ubuntu/.ssh/key.pem
+source ~/.profile
+
+# Step 3: Send .profile and key.pem to all machines for SSH configuration
+scp .profile snn:~/
+scp .ssh/key.pem snn:/home/ubuntu/.ssh/
+
+# Step 4: Update /etc/hosts on all machines to include the correct hostnames
+# SSH into each machine and edit /etc/hosts
+sudo nano /etc/hosts
+# Add the following to /etc/hosts (on each machine):
+# 172.31.32.192 nn
+# 172.31.36.160 snn
+# 172.31.36.189 jt
+# 172.31.42.67 dn1
+# 172.31.44.39 dn2
+# 172.31.44.175 dn3
+
+# Step 5: Update /etc/ssh/ssh_config to avoid "yes/no" prompts
+sudo nano /etc/ssh/ssh_config
+# Change the line: StrictHostKeyChecking ask -> StrictHostKeyChecking no
+
+# Step 6: Install DSH (Distributed Shell) for handling all machines at once
+sudo apt install dsh
+
+# Update dsh configuration
+sudo nano /etc/dsh/machines.list
+# Add the machine names:
+# nn
+# snn
+# jt
+# dn1
+# dn2
+# dn3
+
+# Step 7: Install Java and Hadoop on all machines
+dsh -a sudo apt install openjdk-8-jre -y
+dsh -a sudo apt install openjdk-8-jdk-headless
+dsh -a wget https://archive.apache.org/dist/hadoop/common/hadoop-1.2.1/hadoop-1.2.1.tar.gz
+dsh -a tar -zxf hadoop-1.2.1.tar.gz
+dsh -a sudo mv hadoop-1.2.1 /usr/local/hadoop
+
+# Step 8: Configure environment variables on nn and jt
+# On nn and jt, modify .bashrc to set Hadoop and Java environment variables
+nano ~/.bashrc
+# Add the following:
+# export HADOOP_PREFIX=/usr/local/hadoop/
+# export PATH=$PATH:$HADOOP_PREFIX/bin
+# export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+# export PATH=$PATH:$JAVA_HOME
+
+# Send .bashrc to jt from nn
+scp ~/.bashrc jt:~/
+
+# Step 9: Update Hadoop configuration files on all machines
+# On nn (Namenode)
+sudo nano /usr/local/hadoop/conf/core-site.xml
+# Add the following:
+# <property>
+#   <name>fs.default.name</name>
+#   <value>hdfs://nn:9000</value>
+# </property>
+# <property>
+#   <name>hadoop.tmp.dir</name>
+#   <value>/usr/local/hadoop/tmp</value>
+# </property>
+
+# On jt (JobTracker)
+sudo nano /usr/local/hadoop/conf/mapred-site.xml
+# Add the following:
+# <property>
+#   <name>mapred.job.tracker</name>
+#   <value>hdfs://jt:9001</value>
+# </property>
+
+# Update slaves and masters files
+# On all machines:
+sudo nano /usr/local/hadoop/conf/slaves
+# Add the following (for slaves):
+# dn1
+# dn2
+# dn3
+
+sudo nano /usr/local/hadoop/conf/masters
+# Add the following (for masters):
+# snn
+
+# Step 10: Send Hadoop config files to all machines
+scp /usr/local/hadoop/conf/hadoop-env.sh /usr/local/hadoop/conf/core-site.xml /usr/local/hadoop/conf/mapred-site.xml /usr/local/hadoop/conf/slaves /usr/local/hadoop/conf/masters snn:/usr/local/hadoop/conf/
+
+# Step 11: Create Hadoop temporary directory on all machines
+dsh -a sudo mkdir /usr/local/hadoop/tmp
+
+# Step 12: Execute bash on all machines (make sure you are on nn)
+dsh -a exec bash
+
+# Step 13: Format the Hadoop Namenode (make sure you are on nn)
+ssh nn
+hadoop namenode -format
+
+# Step 14: Start MapReduce (on jt)
+ssh jt
+start-mapred.sh
+
+# Step 15: Start Hadoop DFS (on nn)
+ssh nn
+start-dfs.sh
+
+# Step 16: Check Java processes on all machines
+dsh -a jps
+
+# Verify the machines with the following IPs:
+# nn: 172.31.33.145
+# snn: 172.31.36.2
+# jt: 172.31.39.92
+# dn1: 172.31.40.60
+# dn2: 172.31.44.175
+# dn3: 172.31.47.26
